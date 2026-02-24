@@ -8,7 +8,7 @@
 #include <Preferences.h>
 
 // ==================== RISK MANAGEMENT CONFIGURATIONS ====================
-// This section addresses all risk factors mentioned in your proposal
+
 
 // WiFi Credentials
 #define WIFI_SSID "YourWiFiSSID"
