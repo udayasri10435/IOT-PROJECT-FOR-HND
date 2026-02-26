@@ -11,8 +11,8 @@
 
 
 // WiFi Credentials
-#define WIFI_SSID "YourWiFiSSID"
-#define WIFI_PASSWORD "YourWiFiPassword"
+#define WIFI_SSID "powerhouse"
+#define WIFI_PASSWORD "52181234"
 
 // Firebase Configuration
 #define FIREBASE_HOST "your-project.firebaseio.com"
