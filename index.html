@@ -1,0 +1,2105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Shoe Pro - Posture & Walking Analysis System</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #4361ee;
+            --primary-dark: #3a56d4;
+            --primary-light: #6c8cff;
+            --secondary-color: #3f37c9;
+            --success-color: #4cc9f0;
+            --danger-color: #f72585;
+            --warning-color: #f8961e;
+            --info-color: #4895ef;
+            --dark-color: #1a1a2e;
+            --darker-color: #16213e;
+            --light-color: #f8f9fa;
+            --gray-color: #6c757d;
+            --gray-light: #e9ecef;
+            --card-bg: #ffffff;
+            --sidebar-bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            --border-radius-sm: 8px;
+            --border-radius: 15px;
+            --border-radius-lg: 25px;
+            --box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            --box-shadow-hover: 0 15px 50px rgba(0,0,0,0.15);
+            --transition: all 0.3s ease;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            color: var(--dark-color);
+            overflow-x: hidden;
+        }
+
+        /* Loading Screen */
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+            transition: opacity 0.8s ease;
+        }
+
+        .loading-content {
+            text-align: center;
+            animation: pulse 2s infinite;
+        }
+
+        .shoe-icon {
+            font-size: 80px;
+            color: white;
+            margin-bottom: 30px;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
+            40% {transform: translateY(-30px);}
+            60% {transform: translateY(-15px);}
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .loader {
+            width: 80px;
+            height: 80px;
+            border: 8px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: white;
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            margin-top: 20px;
+        }
+
+        .loading-subtext {
+            color: rgba(255,255,255,0.8);
+            font-size: 16px;
+            margin-top: 10px;
+        }
+
+        /* Main Container */
+        #main-container {
+            min-height: 100vh;
+            display: flex;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--sidebar-bg);
+            color: white;
+            padding: 30px 20px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            transition: var(--transition);
+            z-index: 1000;
+            box-shadow: 2px 0 20px rgba(0,0,0,0.1);
+        }
+
+        .sidebar-header {
+            text-align: center;
+            padding-bottom: 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            margin-bottom: 30px;
+        }
+
+        .sidebar-header i {
+            font-size: 50px;
+            margin-bottom: 15px;
+            animation: float 3s ease-in-out infinite;
+            color: var(--success-color);
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .sidebar-header h2 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .sidebar-header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .device-info-sidebar {
+            background: rgba(255,255,255,0.1);
+            border-radius: var(--border-radius);
+            padding: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .device-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .device-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success-color);
+            animation: pulse 2s infinite;
+        }
+
+        .nav-menu {
+            list-style: none;
+        }
+
+        .nav-item {
+            margin-bottom: 10px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px 20px;
+            color: white;
+            text-decoration: none;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .nav-link:hover {
+            background: rgba(255,255,255,0.15);
+            transform: translateX(5px);
+        }
+
+        .nav-link.active {
+            background: rgba(255,255,255,0.2);
+            border-left: 4px solid var(--success-color);
+        }
+
+        .nav-link i {
+            width: 25px;
+            font-size: 20px;
+        }
+
+        .nav-link span {
+            flex: 1;
+        }
+
+        .badge {
+            background: var(--danger-color);
+            color: white;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 30px;
+            min-height: 100vh;
+        }
+
+        /* Top Header */
+        .top-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px 30px;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+
+        .header-left h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--dark-color);
+            margin-bottom: 5px;
+        }
+
+        .header-left p {
+            color: var(--gray-color);
+            font-size: 14px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: var(--light-color);
+            border-radius: var(--border-radius-lg);
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .status-indicator.connected {
+            background: var(--success-color);
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.disconnected {
+            background: var(--danger-color);
+        }
+
+        .battery-level {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: var(--light-color);
+            border-radius: var(--border-radius-lg);
+        }
+
+        .battery-level i {
+            font-size: 20px;
+            color: var(--success-color);
+        }
+
+        .bluetooth-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .bluetooth-btn:hover {
+            transform: scale(1.1);
+            background: var(--primary-dark);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--box-shadow-hover);
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary-color));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+        }
+
+        .stat-info h3 {
+            font-size: 14px;
+            color: var(--gray-color);
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .stat-info p {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--dark-color);
+        }
+
+        .stat-info small {
+            font-size: 12px;
+            color: var(--success-color);
+        }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 25px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--dark-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-header h3 i {
+            color: var(--primary-color);
+        }
+
+        /* Pressure Map */
+        .pressure-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+        }
+
+        .foot-container {
+            text-align: center;
+        }
+
+        .foot-container h4 {
+            margin-bottom: 15px;
+            color: var(--gray-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .foot-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            background: var(--gray-light);
+            padding: 20px;
+            border-radius: var(--border-radius);
+        }
+
+        .pressure-sensor {
+            background: white;
+            padding: 15px;
+            border-radius: var(--border-radius-sm);
+            text-align: center;
+            transition: var(--transition);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pressure-sensor::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+            transform: scaleX(0);
+            transition: var(--transition);
+        }
+
+        .pressure-sensor:hover::before {
+            transform: scaleX(1);
+        }
+
+        .sensor-label {
+            display: block;
+            font-size: 12px;
+            color: var(--gray-color);
+            margin-bottom: 5px;
+        }
+
+        .sensor-value {
+            display: block;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        /* Temperature Display */
+        .temperature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .temp-item {
+            text-align: center;
+            padding: 20px;
+            background: var(--gray-light);
+            border-radius: var(--border-radius);
+        }
+
+        .temp-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin: 10px 0;
+        }
+
+        .temp-label {
+            color: var(--gray-color);
+            font-size: 14px;
+        }
+
+        /* Alerts Panel */
+        .alerts-panel {
+            background: white;
+            padding: 25px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            margin-bottom: 30px;
+        }
+
+        .alerts-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .alert-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            border-bottom: 1px solid var(--gray-light);
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .alert-item.warning {
+            background: rgba(248, 150, 30, 0.1);
+            border-left: 4px solid var(--warning-color);
+        }
+
+        .alert-item.danger {
+            background: rgba(247, 37, 133, 0.1);
+            border-left: 4px solid var(--danger-color);
+        }
+
+        .alert-item.success {
+            background: rgba(76, 201, 240, 0.1);
+            border-left: 4px solid var(--success-color);
+        }
+
+        .alert-item.info {
+            background: rgba(72, 149, 239, 0.1);
+            border-left: 4px solid var(--info-color);
+        }
+
+        .alert-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .alert-icon.warning {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .alert-icon.danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .alert-icon.success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .alert-icon.info {
+            background: var(--info-color);
+            color: white;
+        }
+
+        .alert-content {
+            flex: 1;
+        }
+
+        .alert-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .alert-time {
+            font-size: 12px;
+            color: var(--gray-color);
+        }
+
+        /* Map Container */
+        .map-container {
+            height: 300px;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        /* Emergency Section */
+        .emergency-section {
+            background: white;
+            padding: 25px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            margin-bottom: 30px;
+        }
+
+        .emergency-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            color: var(--danger-color);
+        }
+
+        .emergency-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .emergency-btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: var(--transition);
+        }
+
+        .emergency-btn.danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .emergency-btn.warning {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .emergency-btn.primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .emergency-btn.success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .emergency-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            text-align: center;
+            color: var(--gray-color);
+            font-size: 14px;
+        }
+
+        /* User Details Form */
+        .user-details-form {
+            background: white;
+            padding: 25px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            margin-bottom: 30px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-weight: 500;
+            color: var(--gray-color);
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 12px 15px;
+            border: 2px solid var(--gray-light);
+            border-radius: var(--border-radius-sm);
+            font-size: 14px;
+            transition: var(--transition);
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        .save-btn {
+            padding: 15px 30px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-top: 20px;
+        }
+
+        .save-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        /* Bluetooth Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: var(--border-radius-lg);
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .device-list {
+            margin: 20px 0;
+        }
+
+        .device-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            border: 1px solid var(--gray-light);
+            border-radius: var(--border-radius);
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .device-item:hover {
+            border-color: var(--primary-color);
+            box-shadow: var(--box-shadow);
+        }
+
+        .scan-btn {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 16px;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-bottom: 10px;
+        }
+
+        .close-btn {
+            width: 100%;
+            padding: 15px;
+            background: var(--gray-light);
+            color: var(--dark-color);
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 80px;
+            }
+            .sidebar-header h2,
+            .sidebar-header p,
+            .device-info-sidebar .device-name,
+            .nav-link span {
+                display: none;
+            }
+            .main-content {
+                margin-left: 80px;
+            }
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .pressure-container {
+                grid-template-columns: 1fr;
+            }
+            .top-header {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+
+        /* Firebase Status Indicator */
+        .firebase-status {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            margin-top: 5px;
+            color: var(--success-color);
+        }
+
+        .firebase-status i {
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loading-content">
+            <div class="shoe-icon">
+                <i class="fas fa-shoe-prints"></i>
+            </div>
+            <div class="loader"></div>
+            <h2 class="loading-text">Smart Shoe Pro</h2>
+            <p class="loading-subtext">Connecting to Firebase Realtime Database...</p>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Container -->
+    <div id="main-container" class="hidden">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-shoe-prints"></i>
+                <h2>Smart Shoe Pro</h2>
+                <p>Posture & Walking Analysis</p>
+                <div class="firebase-status">
+                    <i class="fas fa-circle" style="color: var(--success-color);"></i>
+                    <span>Firebase Connected</span>
+                </div>
+            </div>
+            
+            <div class="device-info-sidebar">
+                <div class="device-name">
+                    <i class="fas fa-bluetooth-b"></i> SmartShoe_Group14
+                </div>
+                <div class="device-status">
+                    <span class="status-dot"></span>
+                    <span>Connected</span>
+                </div>
+            </div>
+            
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a class="nav-link active" onclick="navigateTo('dashboard')">
+                        <i class="fas fa-home"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" onclick="navigateTo('pressure')">
+                        <i class="fas fa-chart-pie"></i>
+                        <span>Pressure Analysis</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" onclick="navigateTo('gait')">
+                        <i class="fas fa-wave-square"></i>
+                        <span>Gait Analysis</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" onclick="navigateTo('steps')">
+                        <i class="fas fa-shoe-prints"></i>
+                        <span>Step Counter</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" onclick="navigateTo('temperature')">
+                        <i class="fas fa-thermometer-half"></i>
+                        <span>Temperature</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" onclick="navigateTo('location')">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>GPS Location</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" onclick="navigateTo('alerts-nav')">
+                        <i class="fas fa-bell"></i>
+                        <span>Alerts</span>
+                        <span class="badge" id="alert-badge">0</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" onclick="navigateTo('emergency')">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Emergency</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" onclick="navigateTo('settings')">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+            </ul>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Header -->
+            <header class="top-header">
+                <div class="header-left">
+                    <h1>Smart Shoe Dashboard</h1>
+                    <p id="current-date"></p>
+                </div>
+                <div class="header-right">
+                    <div class="connection-status" id="connection-status">
+                        <span class="status-indicator connected"></span>
+                        <span>Connected</span>
+                    </div>
+                    <div class="battery-level" id="battery-level">
+                        <i class="fas fa-battery-full"></i>
+                        <span>100%</span>
+                    </div>
+                    <button class="bluetooth-btn" onclick="toggleBluetoothModal()">
+                        <i class="fab fa-bluetooth-b"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- User Details Form -->
+            <div class="user-details-form">
+                <h3 style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-user-circle" style="color: var(--primary-color);"></i>
+                    Your Details
+                </h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label><i class="fas fa-user"></i> Name</label>
+                        <input type="text" id="user-name" placeholder="Enter your name" value="John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-venus-mars"></i> Gender</label>
+                        <select id="user-gender">
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-calendar"></i> Age</label>
+                        <input type="number" id="user-age" placeholder="Age" value="32">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-phone"></i> Emergency Contact</label>
+                        <input type="tel" id="user-emergency" placeholder="Emergency number" value="+1 234 567 8900">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-weight"></i> Weight (kg)</label>
+                        <input type="number" id="user-weight" placeholder="Weight" value="75">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-ruler"></i> Height (cm)</label>
+                        <input type="number" id="user-height" placeholder="Height" value="175">
+                    </div>
+                </div>
+                <button class="save-btn" onclick="saveUserDetails()">
+                    <i class="fas fa-save"></i> Save to Firebase
+                </button>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-shoe-prints"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Today's Steps</h3>
+                        <p id="steps-today">7,234</p>
+                        <small><i class="fas fa-arrow-up"></i> +12% from yesterday</small>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-calendar-week"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>This Week</h3>
+                        <p id="steps-week">48,562</p>
+                        <small>Avg: 6,937 steps/day</small>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-calendar-alt"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>This Month</h3>
+                        <p id="steps-month">198,450</p>
+                        <small>Projected: 215,000</small>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-balance-scale"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Gait Balance</h3>
+                        <p id="gait-balance">98%</p>
+                        <small>Excellent symmetry</small>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-heartbeat"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Posture Score</h3>
+                        <p id="posture-score">95%</p>
+                        <small>Good posture</small>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-fire"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Calories</h3>
+                        <p id="calories">320</p>
+                        <small>Today's burn</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="charts-grid">
+                <!-- Pressure Distribution Chart -->
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-chart-pie"></i> Pressure Distribution</h3>
+                        <div class="firebase-status">
+                            <i class="fas fa-sync-alt fa-spin"></i>
+                            <span>Live</span>
+                        </div>
+                    </div>
+                    <canvas id="pressureChart" style="height: 300px;"></canvas>
+                </div>
+
+                <!-- Gait Analysis Chart -->
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-wave-square"></i> Gait Pattern</h3>
+                        <div class="firebase-status">
+                            <i class="fas fa-sync-alt fa-spin"></i>
+                            <span>Live</span>
+                        </div>
+                    </div>
+                    <canvas id="gaitChart" style="height: 300px;"></canvas>
+                </div>
+            </div>
+
+            <!-- Pressure Map and Temperature Grid -->
+            <div class="charts-grid">
+                <!-- Foot Pressure Map -->
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-map"></i> Real-time Pressure Map</h3>
+                    </div>
+                    <div class="pressure-container">
+                        <!-- Left Foot -->
+                        <div class="foot-container">
+                            <h4><i class="fas fa-shoe-prints" style="color: var(--primary-color);"></i> Left Foot</h4>
+                            <div class="foot-grid">
+                                <div class="pressure-sensor" id="left-heel">
+                                    <span class="sensor-label">Heel</span>
+                                    <span class="sensor-value" id="left-heel-value">0</span>
+                                </div>
+                                <div class="pressure-sensor" id="left-mid">
+                                    <span class="sensor-label">Mid</span>
+                                    <span class="sensor-value" id="left-mid-value">0</span>
+                                </div>
+                                <div class="pressure-sensor" id="left-ball">
+                                    <span class="sensor-label">Ball</span>
+                                    <span class="sensor-value" id="left-ball-value">0</span>
+                                </div>
+                                <div class="pressure-sensor" id="left-toe">
+                                    <span class="sensor-label">Toe</span>
+                                    <span class="sensor-value" id="left-toe-value">0</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Right Foot -->
+                        <div class="foot-container">
+                            <h4><i class="fas fa-shoe-prints" style="color: var(--secondary-color);"></i> Right Foot</h4>
+                            <div class="foot-grid">
+                                <div class="pressure-sensor" id="right-heel">
+                                    <span class="sensor-label">Heel</span>
+                                    <span class="sensor-value" id="right-heel-value">0</span>
+                                </div>
+                                <div class="pressure-sensor" id="right-mid">
+                                    <span class="sensor-label">Mid</span>
+                                    <span class="sensor-value" id="right-mid-value">0</span>
+                                </div>
+                                <div class="pressure-sensor" id="right-ball">
+                                    <span class="sensor-label">Ball</span>
+                                    <span class="sensor-value" id="right-ball-value">0</span>
+                                </div>
+                                <div class="pressure-sensor" id="right-toe">
+                                    <span class="sensor-label">Toe</span>
+                                    <span class="sensor-value" id="right-toe-value">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Temperature Display -->
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-thermometer-half"></i> Temperature Control</h3>
+                    </div>
+                    <div class="temperature-grid">
+                        <div class="temp-item">
+                            <i class="fas fa-thermometer-full" style="color: var(--danger-color); font-size: 24px;"></i>
+                            <div class="temp-value" id="shoe-temp">32°C</div>
+                            <div class="temp-label">Shoe Temperature</div>
+                        </div>
+                        <div class="temp-item">
+                            <i class="fas fa-thermometer-half" style="color: var(--warning-color); font-size: 24px;"></i>
+                            <div class="temp-value" id="ambient-temp">24°C</div>
+                            <div class="temp-label">Ambient Temperature</div>
+                        </div>
+                        <div class="temp-item">
+                            <i class="fas fa-snowflake" style="color: var(--info-color); font-size: 24px;"></i>
+                            <div class="temp-value" id="cooling-status">Active</div>
+                            <div class="temp-label">Cooling System</div>
+                        </div>
+                        <div class="temp-item">
+                            <i class="fas fa-fire" style="color: var(--warning-color); font-size: 24px;"></i>
+                            <div class="temp-value" id="heating-status">Standby</div>
+                            <div class="temp-label">Heating System</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GPS Location and Alerts -->
+            <div class="charts-grid">
+                <!-- GPS Location -->
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-map-marker-alt"></i> Real-time GPS Location</h3>
+                    </div>
+                    <div class="map-container">
+                        <div id="map"></div>
+                    </div>
+                    <div style="margin-top: 15px; display: flex; justify-content: space-between; padding: 10px; background: var(--gray-light); border-radius: var(--border-radius-sm);">
+                        <span><i class="fas fa-latitude"></i> Latitude: <span id="latitude">6.9271° N</span></span>
+                        <span><i class="fas fa-longitude"></i> Longitude: <span id="longitude">79.8612° E</span></span>
+                        <span><i class="fas fa-satellite"></i> Satellites: <span id="satellites">12</span></span>
+                    </div>
+                </div>
+
+                <!-- Alerts Panel -->
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-bell"></i> Real-time Alerts</h3>
+                        <button class="btn-icon" onclick="clearAllAlerts()" style="background: none; border: none; color: var(--gray-color); cursor: pointer;">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="alerts-list" id="alerts-container">
+                        <div class="alert-item success">
+                            <div class="alert-icon success">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <div class="alert-content">
+                                <div class="alert-title">System Ready</div>
+                                <div class="alert-time">Just now</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step History Chart -->
+            <div class="chart-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-bar"></i> Step History</h3>
+                    <select id="step-period" onchange="updateStepHistory()">
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="year">This Year</option>
+                    </select>
+                </div>
+                <canvas id="stepHistoryChart" style="height: 400px;"></canvas>
+            </div>
+
+            <!-- Emergency Section -->
+            <div class="emergency-section">
+                <div class="emergency-title">
+                    <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    <h2>Emergency & Safety Features</h2>
+                </div>
+                <div class="emergency-buttons">
+                    <button class="emergency-btn danger" onclick="triggerEmergency()">
+                        <i class="fas fa-exclamation-circle"></i>
+                        SOS Emergency
+                    </button>
+                    <button class="emergency-btn warning" onclick="testFallDetection()">
+                        <i class="fas fa-flask"></i>
+                        Test Fall Detection
+                    </button>
+                    <button class="emergency-btn primary" onclick="shareLocation()">
+                        <i class="fas fa-share-alt"></i>
+                        Share Location
+                    </button>
+                    <button class="emergency-btn success" onclick="callEmergencyContact()">
+                        <i class="fas fa-phone-alt"></i>
+                        Call Emergency Contact
+                    </button>
+                </div>
+            </div>
+
+            <!-- Firebase Data Viewer -->
+            <div class="chart-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-database"></i> Firebase Realtime Database</h3>
+                    <div class="firebase-status">
+                        <i class="fas fa-circle" style="color: var(--success-color);"></i>
+                        <span>Connected to: iot-project-5df37</span>
+                    </div>
+                </div>
+                <div style="padding: 20px; background: var(--gray-light); border-radius: var(--border-radius); font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto;" id="firebase-debug">
+                    Waiting for data...
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer>
+                <p><i class="fas fa-clock"></i> Last Updated: <span id="last-update">--:--:--</span></p>
+                <p><i class="fas fa-database"></i> Firebase Realtime Database: iot-project-5df37 | <i class="fas fa-code-branch"></i> Smart Shoe Pro v2.0 | Group 14 - NIBM</p>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Bluetooth Pairing Modal -->
+    <div id="bluetooth-modal" class="modal">
+        <div class="modal-content">
+            <h2><i class="fab fa-bluetooth-b"></i> Connect to Smart Shoe</h2>
+            <p>Available Devices:</p>
+            <div class="device-list" id="device-list">
+                <div class="device-item" onclick="connectToDevice('SmartShoe_Group14')">
+                    <div>
+                        <i class="fas fa-shoe-prints"></i>
+                        <strong>SmartShoe_Group14</strong>
+                        <div style="font-size: 12px; color: var(--gray-color);">Signal: Strong</div>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </div>
+                <div class="device-item" onclick="connectToDevice('SmartShoe_Left')">
+                    <div>
+                        <i class="fas fa-shoe-prints"></i>
+                        <strong>SmartShoe_Left</strong>
+                        <div style="font-size: 12px; color: var(--gray-color);">Signal: Medium</div>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </div>
+            </div>
+            <button class="scan-btn" onclick="scanForDevices()">
+                <i class="fas fa-search"></i> Scan for Devices
+            </button>
+            <button class="close-btn" onclick="closeModal()">
+                <i class="fas fa-times"></i> Close
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC3HO11Pv3irRPXcALfM8MbxipWY8VLslY",
+            authDomain: "iot-project-5df37.firebaseapp.com",
+            databaseURL: "https://iot-project-5df37-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "iot-project-5df37",
+            storageBucket: "iot-project-5df37.firebasestorage.app",
+            messagingSenderId: "46150118920",
+            appId: "1:46150118920:web:215135a3870dfb21d9abbd",
+            measurementId: "G-HMCJ7XKP09"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Global variables
+        let pressureChart, gaitChart, stepHistoryChart;
+        let map, marker;
+        let simulationInterval;
+        let currentLocation = { lat: 6.9271, lng: 79.8612 }; // Colombo coordinates
+        let alertCount = 0;
+
+        // Initialize the application
+        window.onload = function() {
+            setTimeout(() => {
+                document.getElementById('loading-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('loading-screen').style.display = 'none';
+                    document.getElementById('main-container').classList.remove('hidden');
+                    initializeEverything();
+                }, 500);
+            }, 2000);
+        };
+
+        function initializeEverything() {
+            updateCurrentDate();
+            initializeCharts();
+            initializeMap();
+            startDataSimulation();
+            loadUserSettings();
+            setupFirebaseListeners();
+            testFirebaseConnection();
+        }
+
+        // Test Firebase Connection
+        function testFirebaseConnection() {
+            const testRef = database.ref('connection-test');
+            testRef.set({
+                timestamp: Date.now(),
+                message: 'Connection successful'
+            }).then(() => {
+                console.log('Firebase connected successfully');
+                addAlert('success', 'Firebase Connected', 'Realtime database is ready');
+            }).catch(error => {
+                console.error('Firebase connection error:', error);
+                addAlert('danger', 'Firebase Error', 'Check your database connection');
+            });
+        }
+
+        // Setup Firebase Listeners
+        function setupFirebaseListeners() {
+            // Listen for sensor data from ESP32
+            const sensorRef = database.ref('sensor-data');
+            sensorRef.limitToLast(1).on('child_added', (snapshot) => {
+                const data = snapshot.val();
+                updateUIFromFirebase(data);
+                updateDebugInfo('sensor-data', data);
+            });
+
+            // Listen for alerts
+            const alertsRef = database.ref('alerts');
+            alertsRef.limitToLast(5).on('child_added', (snapshot) => {
+                const alert = snapshot.val();
+                addAlert(alert.type, alert.title, alert.message);
+                updateDebugInfo('alerts', alert);
+            });
+
+            // Listen for emergency alerts
+            const emergencyRef = database.ref('emergency-alerts');
+            emergencyRef.limitToLast(1).on('child_added', (snapshot) => {
+                const emergency = snapshot.val();
+                if (emergency.type === 'sos') {
+                    handleEmergencyAlert(emergency);
+                }
+                updateDebugInfo('emergency', emergency);
+            });
+
+            // Listen for user data
+            const userRef = database.ref('users/current');
+            userRef.on('value', (snapshot) => {
+                const userData = snapshot.val();
+                if (userData) {
+                    updateUserUI(userData);
+                }
+                updateDebugInfo('users', userData);
+            });
+
+            // Listen for device status
+            const deviceRef = database.ref('device-status');
+            deviceRef.on('value', (snapshot) => {
+                const status = snapshot.val();
+                if (status) {
+                    updateDeviceStatus(status);
+                }
+            });
+        }
+
+        // Update UI from Firebase data
+        function updateUIFromFirebase(data) {
+            if (!data) return;
+
+            // Update pressure sensors
+            if (data.pressure) {
+                if (data.pressure.leftHeel) document.getElementById('left-heel-value').textContent = data.pressure.leftHeel;
+                if (data.pressure.leftMid) document.getElementById('left-mid-value').textContent = data.pressure.leftMid;
+                if (data.pressure.leftBall) document.getElementById('left-ball-value').textContent = data.pressure.leftBall;
+                if (data.pressure.leftToe) document.getElementById('left-toe-value').textContent = data.pressure.leftToe;
+                if (data.pressure.rightHeel) document.getElementById('right-heel-value').textContent = data.pressure.rightHeel;
+                if (data.pressure.rightMid) document.getElementById('right-mid-value').textContent = data.pressure.rightMid;
+                if (data.pressure.rightBall) document.getElementById('right-ball-value').textContent = data.pressure.rightBall;
+                if (data.pressure.rightToe) document.getElementById('right-toe-value').textContent = data.pressure.rightToe;
+            }
+
+            // Update steps
+            if (data.steps) {
+                if (data.steps.today) document.getElementById('steps-today').textContent = data.steps.today.toLocaleString();
+                if (data.steps.week) document.getElementById('steps-week').textContent = data.steps.week.toLocaleString();
+                if (data.steps.month) document.getElementById('steps-month').textContent = data.steps.month.toLocaleString();
+            }
+
+            // Update gait and posture
+            if (data.gait) {
+                if (data.gait.balance) document.getElementById('gait-balance').textContent = data.gait.balance + '%';
+                if (data.gait.posture) document.getElementById('posture-score').textContent = data.gait.posture + '%';
+            }
+
+            // Update temperature
+            if (data.temperature) {
+                if (data.temperature.shoe) document.getElementById('shoe-temp').textContent = data.temperature.shoe + '°C';
+                if (data.temperature.ambient) document.getElementById('ambient-temp').textContent = data.temperature.ambient + '°C';
+                if (data.temperature.cooling) document.getElementById('cooling-status').textContent = data.temperature.cooling;
+                if (data.temperature.heating) document.getElementById('heating-status').textContent = data.temperature.heating;
+            }
+
+            // Update GPS
+            if (data.gps) {
+                if (data.gps.lat) {
+                    currentLocation.lat = data.gps.lat;
+                    currentLocation.lng = data.gps.lng;
+                    updateMapLocation(data.gps.lat, data.gps.lng);
+                }
+                if (data.gps.satellites) document.getElementById('satellites').textContent = data.gps.satellites;
+            }
+
+            // Update calories
+            if (data.calories) {
+                document.getElementById('calories').textContent = data.calories;
+            }
+
+            // Update battery
+            if (data.battery) {
+                updateBatteryFromData(data.battery);
+            }
+        }
+
+        // Update battery from data
+        function updateBatteryFromData(level) {
+            const batteryElement = document.getElementById('battery-level');
+            let icon = 'fa-battery-full';
+            if (level < 20) icon = 'fa-battery-empty';
+            else if (level < 40) icon = 'fa-battery-quarter';
+            else if (level < 60) icon = 'fa-battery-half';
+            else if (level < 80) icon = 'fa-battery-three-quarters';
+            
+            batteryElement.innerHTML = `<i class="fas ${icon}"></i> <span>${level}%</span>`;
+        }
+
+        // Update device status
+        function updateDeviceStatus(status) {
+            const statusElement = document.querySelector('.status-indicator');
+            const statusText = document.querySelector('.connection-status span:last-child');
+            
+            if (status.connected) {
+                statusElement.className = 'status-indicator connected';
+                statusText.textContent = 'Connected';
+            } else {
+                statusElement.className = 'status-indicator disconnected';
+                statusText.textContent = 'Disconnected';
+            }
+        }
+
+        // Handle emergency alert
+        function handleEmergencyAlert(emergency) {
+            addAlert('danger', '🚨 EMERGENCY ALERT', 'SOS triggered at location');
+            
+            if (emergency.location) {
+                updateMapLocation(emergency.location.lat, emergency.location.lng);
+            }
+            
+            // Play sound
+            playAlertSound();
+        }
+
+        // Play alert sound
+        function playAlertSound() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            gainNode.gain.value = 0.5;
+            
+            oscillator.start();
+            setTimeout(() => oscillator.stop(), 500);
+        }
+
+        // Update debug info
+        function updateDebugInfo(path, data) {
+            const debugElement = document.getElementById('firebase-debug');
+            const timestamp = new Date().toLocaleTimeString();
+            debugElement.innerHTML = `<strong>${timestamp} - ${path}:</strong><br>` + 
+                JSON.stringify(data, null, 2) + '<br><br>' + debugElement.innerHTML;
+            
+            // Keep only last 10 entries
+            const lines = debugElement.innerHTML.split('<br><br>');
+            if (lines.length > 10) {
+                debugElement.innerHTML = lines.slice(0, 10).join('<br><br>');
+            }
+        }
+
+        // Initialize Map
+        function initializeMap() {
+            map = L.map('map').setView([currentLocation.lat, currentLocation.lng], 15);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            marker = L.marker([currentLocation.lat, currentLocation.lng]).addTo(map)
+                .bindPopup('Your Current Location')
+                .openPopup();
+        }
+
+        // Update map location
+        function updateMapLocation(lat, lng) {
+            map.setView([lat, lng], 15);
+            marker.setLatLng([lat, lng]);
+            document.getElementById('latitude').textContent = lat.toFixed(4) + '° N';
+            document.getElementById('longitude').textContent = lng.toFixed(4) + '° E';
+        }
+
+        // Initialize Charts
+        function initializeCharts() {
+            // Pressure Distribution Chart
+            const pressureCtx = document.getElementById('pressureChart').getContext('2d');
+            pressureChart = new Chart(pressureCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Heel', 'Midfoot', 'Ball', 'Toe'],
+                    datasets: [{
+                        data: [35, 25, 30, 10],
+                        backgroundColor: ['#4361ee', '#3f37c9', '#4cc9f0', '#f72585'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+
+            // Gait Pattern Chart
+            const gaitCtx = document.getElementById('gaitChart').getContext('2d');
+            gaitChart = new Chart(gaitCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Heel Strike', 'Mid Stance', 'Push Off', 'Toe Off'],
+                    datasets: [{
+                        label: 'Left Foot',
+                        data: [0.8, 1.2, 0.9, 0.3],
+                        borderColor: '#4361ee',
+                        backgroundColor: 'rgba(67, 97, 238, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'Right Foot',
+                        data: [0.7, 1.1, 0.8, 0.2],
+                        borderColor: '#f72585',
+                        backgroundColor: 'rgba(247, 37, 133, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Pressure (kg/cm²)' }
+                        }
+                    }
+                }
+            });
+
+            // Step History Chart
+            const stepCtx = document.getElementById('stepHistoryChart').getContext('2d');
+            stepHistoryChart = new Chart(stepCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{
+                        label: 'Steps',
+                        data: [6543, 7234, 6987, 8123, 7654, 5432, 6789],
+                        backgroundColor: 'rgba(67, 97, 238, 0.7)',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Number of Steps' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update current date
+        function updateCurrentDate() {
+            const date = new Date();
+            document.getElementById('current-date').textContent = 
+                date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        }
+
+        // Data Simulation (for testing - will be replaced by real ESP32 data)
+        function startDataSimulation() {
+            simulationInterval = setInterval(() => {
+                generateSimulatedData();
+            }, 3000);
+        }
+
+        function generateSimulatedData() {
+            // Generate random sensor data
+            const sensorData = {
+                pressure: {
+                    leftHeel: Math.floor(Math.random() * 500) + 300,
+                    leftMid: Math.floor(Math.random() * 400) + 200,
+                    leftBall: Math.floor(Math.random() * 450) + 250,
+                    leftToe: Math.floor(Math.random() * 300) + 150,
+                    rightHeel: Math.floor(Math.random() * 500) + 300,
+                    rightMid: Math.floor(Math.random() * 400) + 200,
+                    rightBall: Math.floor(Math.random() * 450) + 250,
+                    rightToe: Math.floor(Math.random() * 300) + 150
+                },
+                steps: {
+                    today: Math.floor(Math.random() * 1000) + 7000,
+                    week: Math.floor(Math.random() * 5000) + 45000,
+                    month: Math.floor(Math.random() * 20000) + 190000
+                },
+                gait: {
+                    balance: Math.floor(Math.random() * 10) + 90,
+                    posture: Math.floor(Math.random() * 10) + 85
+                },
+                temperature: {
+                    shoe: Math.floor(Math.random() * 10) + 28,
+                    ambient: Math.floor(Math.random() * 8) + 22,
+                    cooling: Math.random() > 0.5 ? 'Active' : 'Standby',
+                    heating: Math.random() > 0.7 ? 'Active' : 'Standby'
+                },
+                gps: {
+                    lat: currentLocation.lat + (Math.random() - 0.5) * 0.001,
+                    lng: currentLocation.lng + (Math.random() - 0.5) * 0.001,
+                    satellites: Math.floor(Math.random() * 5) + 8
+                },
+                calories: Math.floor(Math.random() * 50) + 300,
+                battery: Math.floor(Math.random() * 20) + 80,
+                timestamp: Date.now()
+            };
+
+            // Update UI
+            updateUIFromFirebase(sensorData);
+
+            // Save to Firebase
+            database.ref('sensor-data/' + Date.now()).set(sensorData)
+                .then(() => {
+                    console.log('Data saved to Firebase');
+                })
+                .catch(error => {
+                    console.error('Error saving to Firebase:', error);
+                });
+
+            // Random alerts (10% chance)
+            if (Math.random() > 0.9) {
+                generateRandomAlert();
+            }
+
+            // Update last update time
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+        }
+
+        function generateRandomAlert() {
+            const alerts = [
+                { type: 'warning', title: 'Uneven Pressure Detected', message: 'Left foot pressure is higher than right' },
+                { type: 'danger', title: 'Fall Risk Detected', message: 'Unusual gait pattern detected' },
+                { type: 'success', title: 'Good Posture', message: 'Your posture is excellent!' },
+                { type: 'info', title: 'GPS Signal', message: 'GPS signal strength: Strong' },
+                { type: 'warning', title: 'Temperature Alert', message: 'Shoe temperature rising' }
+            ];
+            
+            const alert = alerts[Math.floor(Math.random() * alerts.length)];
+            
+            // Save to Firebase
+            database.ref('alerts/' + Date.now()).set({
+                type: alert.type,
+                title: alert.title,
+                message: alert.message,
+                timestamp: Date.now()
+            });
+        }
+
+        function addAlert(type, title, message) {
+            const container = document.getElementById('alerts-container');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert-item ${type}`;
+            
+            let icon = 'info-circle';
+            if (type === 'warning') icon = 'exclamation-triangle';
+            else if (type === 'danger') icon = 'exclamation-circle';
+            else if (type === 'success') icon = 'check-circle';
+            
+            alertDiv.innerHTML = `
+                <div class="alert-icon ${type}">
+                    <i class="fas fa-${icon}"></i>
+                </div>
+                <div class="alert-content">
+                    <div class="alert-title">${title}</div>
+                    <div class="alert-time">${new Date().toLocaleTimeString()}</div>
+                </div>
+            `;
+            
+            container.insertBefore(alertDiv, container.firstChild);
+            
+            // Update alert badge
+            alertCount++;
+            document.getElementById('alert-badge').textContent = alertCount;
+            document.getElementById('alert-badge').style.display = 'inline';
+            
+            // Remove oldest alert if too many
+            if (container.children.length > 10) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        function clearAllAlerts() {
+            document.getElementById('alerts-container').innerHTML = '';
+            alertCount = 0;
+            document.getElementById('alert-badge').style.display = 'none';
+            
+            // Clear from Firebase
+            database.ref('alerts').remove();
+        }
+
+        // Navigation
+        function navigateTo(section) {
+            const navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach(link => link.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            // Scroll to relevant section
+            const sections = {
+                'dashboard': 0,
+                'pressure': '.pressure-container',
+                'steps': '#stepHistoryChart',
+                'temperature': '.temperature-grid',
+                'location': '#map',
+                'alerts-nav': '#alerts-container',
+                'emergency': '.emergency-section'
+            };
+            
+            if (sections[section]) {
+                if (section === 'dashboard') {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    document.querySelector(sections[section]).scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        }
+
+        // User Details
+        function saveUserDetails() {
+            const userData = {
+                name: document.getElementById('user-name').value,
+                gender: document.getElementById('user-gender').value,
+                age: document.getElementById('user-age').value,
+                emergency: document.getElementById('user-emergency').value,
+                weight: document.getElementById('user-weight').value,
+                height: document.getElementById('user-height').value,
+                timestamp: Date.now()
+            };
+            
+            // Save to Firebase
+            database.ref('users/current').set(userData)
+                .then(() => {
+                    addAlert('success', 'Saved', 'User details saved to Firebase');
+                })
+                .catch(error => {
+                    console.error('Error saving user details:', error);
+                    addAlert('danger', 'Error', 'Failed to save to Firebase');
+                });
+        }
+
+        function loadUserSettings() {
+            database.ref('users/current').once('value')
+                .then((snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        updateUserUI(data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading user details:', error);
+                });
+        }
+
+        function updateUserUI(data) {
+            document.getElementById('user-name').value = data.name || 'John Doe';
+            document.getElementById('user-gender').value = data.gender || 'male';
+            document.getElementById('user-age').value = data.age || 32;
+            document.getElementById('user-emergency').value = data.emergency || '+1 234 567 8900';
+            document.getElementById('user-weight').value = data.weight || 75;
+            document.getElementById('user-height').value = data.height || 175;
+        }
+
+        // Step History Update
+        function updateStepHistory() {
+            const period = document.getElementById('step-period').value;
+            
+            let labels, data;
+            
+            if (period === 'week') {
+                labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                data = [6543, 7234, 6987, 8123, 7654, 5432, 6789];
+            } else if (period === 'month') {
+                labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+                data = [48562, 51234, 49876, 52345];
+            } else if (period === 'year') {
+                labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                data = [210000, 195000, 220000, 205000, 230000, 215000, 225000, 240000, 235000, 250000, 245000, 260000];
+            }
+            
+            stepHistoryChart.data.labels = labels;
+            stepHistoryChart.data.datasets[0].data = data;
+            stepHistoryChart.update();
+        }
+
+        // Bluetooth Functions
+        function toggleBluetoothModal() {
+            document.getElementById('bluetooth-modal').classList.toggle('show');
+        }
+
+        function scanForDevices() {
+            addAlert('info', 'Scanning', 'Searching for nearby smart shoes...');
+            
+            // Update device status in Firebase
+            database.ref('device-status').update({
+                scanning: true,
+                timestamp: Date.now()
+            });
+        }
+
+        function connectToDevice(deviceName) {
+            addAlert('info', 'Connecting', `Connecting to ${deviceName}...`);
+            
+            // Update connection status in Firebase
+            database.ref('device-status').update({
+                connected: true,
+                deviceName: deviceName,
+                timestamp: Date.now()
+            });
+            
+            setTimeout(() => {
+                document.querySelector('.status-indicator').className = 'status-indicator connected';
+                document.querySelector('.connection-status span:last-child').textContent = 'Connected';
+                addAlert('success', 'Connected', `Successfully connected to ${deviceName}`);
+                closeModal();
+            }, 1500);
+        }
+
+        function closeModal() {
+            document.getElementById('bluetooth-modal').classList.remove('show');
+        }
+
+        // Emergency Functions
+        function triggerEmergency() {
+            if (confirm('🚨 EMERGENCY: Send SOS alert to emergency contacts?')) {
+                const emergencyData = {
+                    type: 'sos',
+                    location: currentLocation,
+                    timestamp: Date.now(),
+                    user: document.getElementById('user-name').value,
+                    emergencyContact: document.getElementById('user-emergency').value
+                };
+                
+                // Save to Firebase
+                database.ref('emergency-alerts/' + Date.now()).set(emergencyData)
+                    .then(() => {
+                        addAlert('danger', '🚨 SOS ALERT', 'Emergency contacts notified');
+                        playAlertSound();
+                    });
+            }
+        }
+
+        function testFallDetection() {
+            addAlert('warning', '⚠️ Fall Detection Test', 'Simulating fall detection...');
+            
+            setTimeout(() => {
+                addAlert('danger', '🚨 FALL DETECTED', 'Impact detected! Checking if you need help...');
+                
+                if (navigator.vibrate) {
+                    navigator.vibrate([500, 200, 500]);
+                }
+                
+                // Save to Firebase
+                database.ref('alerts/' + Date.now()).set({
+                    type: 'danger',
+                    title: 'Fall Detected',
+                    message: 'Fall detected during test',
+                    location: currentLocation,
+                    timestamp: Date.now()
+                });
+                
+                setTimeout(() => {
+                    if (!confirm('FALL DETECTED! Do you need help? Click Cancel if you are OK')) {
+                        addAlert('success', 'OK Response Received', 'Emergency canceled');
+                    } else {
+                        triggerEmergency();
+                    }
+                }, 3000);
+            }, 2000);
+        }
+
+        function shareLocation() {
+            const location = `https://maps.google.com/?q=${currentLocation.lat},${currentLocation.lng}`;
+            
+            navigator.clipboard.writeText(location).then(() => {
+                addAlert('success', '📍 Location Copied', 'Your location has been copied to clipboard');
+                alert('Location copied to clipboard: ' + location);
+            }).catch(() => {
+                prompt('Your current location:', location);
+            });
+        }
+
+        function callEmergencyContact() {
+            const emergencyNumber = document.getElementById('user-emergency').value;
+            if (emergencyNumber) {
+                if (confirm(`Call ${emergencyNumber}?`)) {
+                    window.location.href = `tel:${emergencyNumber}`;
+                    addAlert('info', '📞 Calling', `Calling emergency contact...`);
+                    
+                    // Log to Firebase
+                    database.ref('emergency-calls/' + Date.now()).set({
+                        number: emergencyNumber,
+                        timestamp: Date.now()
+                    });
+                }
+            } else {
+                alert('Please set an emergency contact number first');
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('bluetooth-modal');
+            if (event.target === modal) {
+                modal.classList.remove('show');
+            }
+        };
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (simulationInterval) clearInterval(simulationInterval);
+            } else {
+                startDataSimulation();
+            }
+        });
+    </script>
+</body>
+</html>
